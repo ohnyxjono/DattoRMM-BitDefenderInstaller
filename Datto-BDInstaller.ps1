@@ -32,10 +32,10 @@
 # Put values between the single quotes
 
 # Get from GravityZone "My Account" page. It needs at least Companies and Packages API. 
-$bitDefenderAPIKey = '562321372dc448ae4f034799fb0907db8e814d3037c6d38b07fb57a2be14cecd'
+$bitDefenderAPIKey = ''
 
 # Get from GravityZone "My Company" page. Its the one titled "My Company ID". This is the account which has access to all the sub/client accounts.
-$bitdefenderCompanyID = '3c14e3ae5d59a35a501e8ab716bc043a'
+$bitdefenderCompanyID = ''
 
 # Test mode setting - Will only do the actual installation if set to "false". 
 $testmode = 'true'
