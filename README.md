@@ -8,6 +8,7 @@ rmmvBitDefenderAPIKey - The BitDefender API Key
 rmmvBitDefenderCompanyID - The BitDefender CompanyID
 TestMode (Selection) - any value apart from "false" will set it to test mode.
 VerboseOutput - on/off selection
+rmmvCustNameOverride - Variable Value - default to off. If its set to anything other than false it will use that as the Company Name in BitDefender
 
 The script connects to the BitDefender GraviyZone API and does the following:
 

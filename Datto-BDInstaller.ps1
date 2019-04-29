@@ -43,8 +43,13 @@ $testmode = $env:TestMode
 # Verbose output. Useful for debugging if something isn't working properly. Change to "true" to turn on.
 $testmodeVerbose = $env:VerboseOutput
 
-#find the Site name of the device this is running on using the CS_PROFILE_NAME variable
-$custName = $env:CS_PROFILE_NAME
+# If no customer name override is set then use the Site name of the endpoint in Datto RMM using the CS_PROFILE_NAME variable
+If ($env:rmmvCustNameOverride -ne "false") {
+    $custName = $env:CS_PROFILE_NAME
+}
+Else {
+    $custname = $env:rmmvCustNameOverride
+}
 
 ##########################
 #    No more variables   #
