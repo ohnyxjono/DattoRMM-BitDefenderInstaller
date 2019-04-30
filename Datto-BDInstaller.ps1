@@ -47,7 +47,7 @@ $testmode = $env:TestMode
 $testmodeVerbose = $env:VerboseOutput
 
 # If no customer name override is set then use the Site name of the endpoint in Datto RMM using the CS_PROFILE_NAME variable
-If ($env:rmmvCustNameOverride -ne "false") {
+If ($env:rmmvCustNameOverride -eq "false") {
     $custName = $env:CS_PROFILE_NAME
 }
 Else {
@@ -55,9 +55,15 @@ Else {
 }
 
 # Allow override to go direct to package install - needs package site code from installer links
-If ($env:rmmvPackageOverride -ne "false") {
+If ($env:rmmvPackageOverride -eq "false") {
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "Package overrise not set."
+    }
+}
+Else {
     $packageInstallIDString = $env:rmmvPackageOverride
     $skipToInstall = 'true'
+    Write-Host "Package override set. `nPackage ID set to $$packageInstallIDString `nSkipping to installer."
 }
 
 ##########################
