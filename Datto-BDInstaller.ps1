@@ -11,7 +11,7 @@
 # Version History:
 # 24 Apr 2019 - Initial release
 # 27 Apr 2019 - Removed datto api dependency, added contributions and cleaned up some documentation
-# 30 Apr 2019 - Re-worked logic to account for packages already existing. Removed dependancy on specific package name. Added additional error checking 
+# 30 Apr 2019 - Re-worked logic to account for packages already existing. Removed dependancy on specific package name. Added additional error checking. Added overrides for company name and package ID 
 #
 # Full BitDefender API documentation at https://download.bitdefender.com/business/API/Bitdefender_GravityZone_Cloud_APIGuide_forPartners_enUS.pdf
 #
@@ -22,6 +22,9 @@
 #
 #
 
+# Clean up custExists variable - Mainly For re-testing script in ISE
+$custExists = ''
+$skipToInstall = ''
 
 ##########################
 # Set required variables #
@@ -51,243 +54,304 @@ Else {
     $custname = $env:rmmvCustNameOverride
 }
 
+# Allow override to go direct to package install - needs package site code from installer links
+If ($env:rmmvPackageOverride -ne "false") {
+    $packageInstallIDString = $env:rmmvPackageOverride
+    $skipToInstall = 'true'
+}
+
 ##########################
 #    No more variables   #
 ##########################
 
+# If skip to install is true, skip to the installer
+If ($skipToInstall -eq 'true') {
 
-# Run some initial environment checks
-If ($bitDefenderAPIKey -eq 'xxxxxxxxxx') {
-    Write-Host "You have not updated the BitDefender API Key. It will not work without this. Existing script."
-    exit
-}
-Elseif ($bitdefenderCompanyID -eq 'xxxxxxxxxx') {
-    Write-Host "You have not updated the BitDefender Company ID. It will not work without this. Existing script."
-    exit
-}
-Else {
-    Write-Host "Variables changed from default. Continuing."
-}
-
-# Check Powershell Version is at least version 3.0
-if ($PSVersionTable.PSVersion.Major -le 3) {
-    Write-Host "This script uses Invoke-RestMethod which was introduced in Powershell 3.0.`nPowershell needs to be at least version 3 to run this script. Update powershell before running this."
-    exit
-}
-
-# Clean up custExists variable - For re-testing script in ISE
-$custExists = ''
-
-# Append ":" to the end of the BitDefender API key
-$bitDefenderAPIKeyFormatted = $bitDefenderAPIKey + ':'
-
-Write-Host "`nStarting BitDefender script component."
-
-## Set global variables ##
-
-# Set the API key for BitDefender GravityZone.
-$apikey = $bitDefenderAPIKeyFormatted
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender API Key variable set to: $apikey"
-}
-
-# Set API endpoint base URI
-$api = "https://cloud.gravityzone.bitdefender.com/api/v1.0/jsonrpc"
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender API URL variable set to: $api"
-}
-
-# Convert the API key to Basic - needed for auth
-$bytes = [System.Text.Encoding]::ASCII.GetBytes($apikey)
-$base64 = [System.Convert]::ToBase64String($bytes)
-$basicAuthValue = "Basic $base64"
-
-# Set the header to use the Basic Auth converted above
-$headers = @{ Authorization = $basicAuthValue }
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender headers variable set to: $headers"
-}
-
-# [Info] Display what company is being created
-write-host "Company Name set to" $custName
-
-## End global variables ##
-
-
-## Start Create Company ##
-
-
-# Set endpoint to work with as the companies one
-$endpoint = "$api/companies"
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender API endpoint variable set to: $endpoint"
-}
-
-# Check if the company already exists
-$data = @{ 
-"id" = $bitdefenderCompanyID
-"method" = "findCompaniesByName"
-"jsonrpc" = "2.0"
-"params" = @{
-    "nameFilter" = "$custName"}
-} 
-
-# Convert the body data to json format for use in API
-$body = $data | ConvertTo-Json
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender API data set to: $body"
-    Write-Host "Endpoint: $endpoint `nHeaders: "$headers.Values
-}
-
-Write-Host "Checking if $custName already exists"
-
-# Call API to populate custID with company info (if it exists)
-$custID = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
-
-If ($testmodeVerbose -ne "false") {
-    # Convert results to Json so it all displays
-    $custIDTestData = $custID | ConvertTo-Json
-    Write-Host "BitDefender retrieved data: $custIDTestData"
-}
-
-# If a result was returned (can only ever be one, BD has its own check for names being unique)
-if ($custID.result.count -eq 1)
-{ 
-    If ($testmodeVerbose -ne "false") {
-        Write-Host "Customer ID not empty. Data: "$custID.result
+    # Run some initial environment checks
+    If ($bitDefenderAPIKey -eq 'xxxxxxxxxx') {
+        Write-Host "You have not updated the BitDefender API Key. It will not work without this. Existing script."
+        exit
     }
-    $custID.result = $custID.result."id"
-    write-host "Customer already exists. ID is" $custID.result
-    #set variable that customer already exists for use later
-    $custExists = "true"
-    If ($testmodeVerbose -ne "false") {
-        Write-Host "Variable set for customer exists: custExists = $custExists"
-    }
-}
-Else {
-    Write-Host "Customer does not exist already. Creating company $custName in BitDefender GravityZone..."
-    
-    # Define variables for making a new company
-    $data = @{ 
-    "id" = $bitdefenderCompanyID
-    "method" = 'createCompany'
-    "jsonrpc" = "2.0"
-    "params" = @{
-        "type" = 1
-        "name" = "$custName"}
-    } 
-    If ($testmodeVerbose -ne "false") {
-        Write-Host "BitDefender API data changed to: $data"
-    }
-    # Convert the body data to json format
-    $body = $data | ConvertTo-Json
-    If ($testmodeVerbose -ne "false") {
-        Write-Host "BitDefender API data updated. New values: $body"
-    }
-    
-    $custID = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
-    If ($custID.result) {
-        Write-Host "Create company success"
+    Elseif ($bitdefenderCompanyID -eq 'xxxxxxxxxx') {
+        Write-Host "You have not updated the BitDefender Company ID. It will not work without this. Existing script."
+        exit
     }
     Else {
-        Write-Host "Create company failed. Exiting script, something went wrong."
+        Write-Host "Variables changed from default. Continuing."
+    }
+
+    # Check Powershell Version is at least version 3.0
+    if ($PSVersionTable.PSVersion.Major -le 3) {
+        Write-Host "This script uses Invoke-RestMethod which was introduced in Powershell 3.0.`nPowershell needs to be at least version 3 to run this script. Update powershell before running this."
         exit
     }
 
+
+
+    # Append ":" to the end of the BitDefender API key
+    $bitDefenderAPIKeyFormatted = $bitDefenderAPIKey + ':'
+
+    Write-Host "`nStarting BitDefender script component."
+
+    ## Set global variables ##
+
+    # Set the API key for BitDefender GravityZone.
+    $apikey = $bitDefenderAPIKeyFormatted
     If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender API call data returned: "$custID.result
+        Write-Host "BitDefender API Key variable set to: $apikey"
     }
 
-    Write-Host $custName "created. ID is" $custID.result
-}
+    # Set API endpoint base URI
+    $api = "https://cloud.gravityzone.bitdefender.com/api/v1.0/jsonrpc"
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "BitDefender API URL variable set to: $api"
+    }
 
-Write-Host "BitDefender customer check complete. Moving to package creation."
-## End create comapny ##
-## Start process package ##
+    # Convert the API key to Basic - needed for auth
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes($apikey)
+    $base64 = [System.Convert]::ToBase64String($bytes)
+    $basicAuthValue = "Basic $base64"
 
-# Change API endpoint to packages
-$endpoint = "$api/packages" 
-If ($testmodeVerbose -ne "false") {
-    Write-Host "BitDefender endpoint changed to: $endpoint"
-}
+    # Set the header to use the Basic Auth converted above
+    $headers = @{ Authorization = $basicAuthValue }
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "BitDefender headers variable set to: $headers"
+    }
 
-# If the company already exists, check if a package already exists.
-If ($custExists -eq "true") {
-    
-    # [Info] Notify company exists, checking package existance
-    write-host "Checking if package already exists for $custName"
+    # [Info] Display what company is being created
+    write-host "Company Name set to" $custName
 
-    # Set data for the check
-    $data = @{
+    ## End global variables ##
+
+
+    ## Start Create Company ##
+
+
+    # Set endpoint to work with as the companies one
+    $endpoint = "$api/companies"
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "BitDefender API endpoint variable set to: $endpoint"
+    }
+
+    # Check if the company already exists
+    $data = @{ 
     "id" = $bitdefenderCompanyID
-    "method" = "getPackagesList"
+    "method" = "findCompaniesByName"
     "jsonrpc" = "2.0"
     "params" = @{
-        "companyId" = $custID.result
-        } #End Params
-    } #End Data
-    If ($testmodeVerbose -ne "false") {
-        Write-Host "BitDefender API data changed to: "$data.Values
-    }
+        "nameFilter" = "$custName"}
+    } 
 
+    # Convert the body data to json format for use in API
     $body = $data | ConvertTo-Json
     If ($testmodeVerbose -ne "false") {
-        Write-Host "BitDefender API data converted to: $body"
+        Write-Host "BitDefender API data set to: $body"
+        Write-Host "Endpoint: $endpoint `nHeaders: "$headers.Values
     }
 
-    $custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+    Write-Host "Checking if $custName already exists"
+
+    # Call API to populate custID with company info (if it exists)
+    $custID = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+
     If ($testmodeVerbose -ne "false") {
-        Write-Host "Data returned from API call: "$custPackage.result
+        # Convert results to Json so it all displays
+        $custIDTestData = $custID | ConvertTo-Json
+        Write-Host "BitDefender retrieved data: $custIDTestData"
     }
 
-    # If value is returned for customer package it means that at least one exists. Don't try to make another one, get details of current one.
-    If ($custPackage.result.items) {
-
-        # If there is more than 1 package, just get the ID of the first package
-        If ($custPackage.result.total -gt 1) {
-            Write-Host "Multiple packages already exists. ID's are:" $custPackage.result.items."id"
-            $custPackageID = $custPackage.result.items."id" | Select-Object -first 1
-            Write-Host "Grabbed first result as package to use"
+    # If a result was returned (can only ever be one, BD has its own check for names being unique)
+    if ($custID.result.count -eq 1)
+    { 
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "Customer ID not empty. Data: "$custID.result
         }
-        Elseif ($custPackage.result.total -eq 1) {
-            Write-Host "Package already exists. ID is: " $custPackage.result.items."id"
-            $custPackageID = $custPackage.result.items."id"
+        $custID.result = $custID.result."id"
+        write-host "Customer already exists. ID is" $custID.result
+        #set variable that customer already exists for use later
+        $custExists = "true"
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "Variable set for customer exists: custExists = $custExists"
         }
-
-        Write-Host "Using package ID: $custPackageID"
-
-        Write-Host "Getting name of package"
-
-        $data = @{
-        "id" = $bitdefenderCompanyID
-        "method" = "getPackageDetails"
-        "jsonrpc" = "2.0"
-        "params" = @{
-            "packageId" = $custPackageID} # End Params
-        } # End Data
-
-        $body = $data | ConvertTo-Json
-
-        $packageName = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
-
-        Write-Host "Retrieved package name: "$packageName.result.packageName
-
-        $custPackageName = $packageName.result.packageName
-
     }
+    Else {
+        Write-Host "Customer does not exist already. Creating company $custName in BitDefender GravityZone..."
     
-    Else { # No existing package found. Make a new one. 
-        Write-Host "A company exists but there are no packages associated with it. Creating package for company."
-        Write-Host "Using default package name: Endpoint - $custName"
-        $custPackageName = "Endpoint - $custName"
-        
-        # update data being passed to API endpoint for making the package
+        # Define variables for making a new company
         $data = @{ 
         "id" = $bitdefenderCompanyID
+        "method" = 'createCompany'
+        "jsonrpc" = "2.0"
+        "params" = @{
+            "type" = 1
+            "name" = "$custName"}
+        } 
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "BitDefender API data changed to: $data"
+        }
+        # Convert the body data to json format
+        $body = $data | ConvertTo-Json
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "BitDefender API data updated. New values: $body"
+        }
+    
+        $custID = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+        If ($custID.result) {
+            Write-Host "Create company success"
+        }
+        Else {
+            Write-Host "Create company failed. Exiting script, something went wrong."
+            exit
+        }
+
+        If ($testmodeVerbose -ne "false") {
+        Write-Host "BitDefender API call data returned: "$custID.result
+        }
+
+        Write-Host $custName "created. ID is" $custID.result
+    }
+
+    Write-Host "BitDefender customer check complete. Moving to package creation."
+    ## End create comapny ##
+    ## Start process package ##
+
+    # Change API endpoint to packages
+    $endpoint = "$api/packages" 
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "BitDefender endpoint changed to: $endpoint"
+    }
+
+    # If the company already exists, check if a package already exists.
+    If ($custExists -eq "true") {
+    
+        # [Info] Notify company exists, checking package existance
+        write-host "Checking if package already exists for $custName"
+
+        # Set data for the check
+        $data = @{
+        "id" = $bitdefenderCompanyID
+        "method" = "getPackagesList"
+        "jsonrpc" = "2.0"
+        "params" = @{
+            "companyId" = $custID.result
+            } #End Params
+        } #End Data
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "BitDefender API data changed to: "$data.Values
+        }
+
+        $body = $data | ConvertTo-Json
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "BitDefender API data converted to: $body"
+        }
+
+        $custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "Data returned from API call: "$custPackage.result
+        }
+
+        # If value is returned for customer package it means that at least one exists. Don't try to make another one, get details of current one.
+        If ($custPackage.result.items) {
+
+            # If there is more than 1 package, just get the ID of the first package
+            If ($custPackage.result.total -gt 1) {
+                Write-Host "Multiple packages already exists. ID's are:" $custPackage.result.items."id"
+                $custPackageID = $custPackage.result.items."id" | Select-Object -first 1
+                Write-Host "Grabbed first result as package to use"
+            }
+            Elseif ($custPackage.result.total -eq 1) {
+                Write-Host "Package already exists. ID is: " $custPackage.result.items."id"
+                $custPackageID = $custPackage.result.items."id"
+            }
+
+            Write-Host "Using package ID: $custPackageID"
+
+            Write-Host "Getting name of package"
+
+            $data = @{
+            "id" = $bitdefenderCompanyID
+            "method" = "getPackageDetails"
+            "jsonrpc" = "2.0"
+            "params" = @{
+                "packageId" = $custPackageID} # End Params
+            } # End Data
+
+            $body = $data | ConvertTo-Json
+
+            $packageName = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+
+            Write-Host "Retrieved package name: "$packageName.result.packageName
+
+            $custPackageName = $packageName.result.packageName
+
+        }
+    
+        Else { # No existing package found. Make a new one. 
+            Write-Host "A company exists but there are no packages associated with it. Creating package for company."
+            Write-Host "Using default package name: Endpoint - $custName"
+            $custPackageName = "Endpoint - $custName"
+        
+            # update data being passed to API endpoint for making the package
+            $data = @{ 
+            "id" = $bitdefenderCompanyID
+            "method" = "createPackage"
+            "jsonrpc" = "2.0"
+            "params" = @{
+                "packageName" = $custPackageName
+                "companyId" = $custID.result
+                "description" = "Endpoint for $custName - automatically generated"
+                "language" = "en_US"
+                "modules" = @{
+                    "atc" = 1
+                    "firewall" = 1
+                    "contentControl" = 1
+                    "deviceControl" = 1
+                    "powerUser" = 1
+                    }
+                "scanMode" = @{
+                    "type" = 1
+                    }
+                "settings" = @{
+                    "scanBeforeInstall" = 0
+                    }
+                "roles" = @{
+                    "relay" = 0
+                    "exchange" = 0
+                    }
+                "deploymentOptions" = @{
+                    "type" = 1
+                    }
+                } # End Params
+            } # End Data
+
+            $body = $data | ConvertTo-Json
+        
+            # [Info] Notify package creation
+            $custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+        
+            # Check package created successfully
+            If ($custPackage.result.success -eq "True") {
+                Write-Host "Package created successfully."
+                Write-Host "ID is: " $custPackage.result.records
+            }
+            Else {
+                Write-Host "Package create failed. Terminating script, something went wrong."
+                break
+            }
+         }
+    }
+    Else {
+        Write-Host "Company didn't exist before so no package could have been associated with it. Making new package with default values."
+        Write-Host "Using default package name: Endpoint - $custName"
+        $custPackageName = "Endpoint - $custName"
+
+        # update data being passed to API endpoint for making the package
+        $data = @{ 
+        "id" = $bitdefenderCompanyID 
         "method" = "createPackage"
         "jsonrpc" = "2.0"
         "params" = @{
-            "packageName" = $custPackageName
+            "packageName" = "Endpoint - $custName"
             "companyId" = $custID.result
             "description" = "Endpoint for $custName - automatically generated"
             "language" = "en_US"
@@ -315,8 +379,9 @@ If ($custExists -eq "true") {
         } # End Data
 
         $body = $data | ConvertTo-Json
-        
+
         # [Info] Notify package creation
+        write-host "Creating installation package for $custName"
         $custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
         
         # Check package created successfully
@@ -328,96 +393,42 @@ If ($custExists -eq "true") {
             Write-Host "Package create failed. Terminating script, something went wrong."
             break
         }
-     }
-}
-Else {
-    Write-Host "Company didn't exist before so no package could have been associated with it. Making new package with default values."
-    Write-Host "Using default package name: Endpoint - $custName"
-    $custPackageName = "Endpoint - $custName"
+    }
+    ## End process Package ##
+    ## Start get package ID ##
 
-    # update data being passed to API endpoint for making the package
-    $data = @{ 
-    "id" = $bitdefenderCompanyID 
-    "method" = "createPackage"
+    Write-Host "Getting site code for installation"
+
+    # update data being passed to API endpoint for getting the package install SiteCode
+    $data = @{
+    "id" = $bitdefenderCompanyID
+    "method" = "getInstallationLinks"
     "jsonrpc" = "2.0"
     "params" = @{
-        "packageName" = "Endpoint - $custName"
-        "companyId" = $custID.result
-        "description" = "Endpoint for $custName - automatically generated"
-        "language" = "en_US"
-        "modules" = @{
-            "atc" = 1
-            "firewall" = 1
-            "contentControl" = 1
-            "deviceControl" = 1
-            "powerUser" = 1
-            }
-        "scanMode" = @{
-            "type" = 1
-            }
-        "settings" = @{
-            "scanBeforeInstall" = 0
-            }
-        "roles" = @{
-            "relay" = 0
-            "exchange" = 0
-            }
-        "deploymentOptions" = @{
-            "type" = 1
-            }
-        } # End Params
+        "packageName" = $custPackageName} # End Params
     } # End Data
 
     $body = $data | ConvertTo-Json
 
-    # [Info] Notify package creation
-    write-host "Creating installation package for $custName"
-    $custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
-        
-    # Check package created successfully
-    If ($custPackage.result.success -eq "True") {
-        Write-Host "Package created successfully."
-        Write-Host "ID is: " $custPackage.result.records
+    $packageInstallIDRaw = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "Data returned for package ID: "$packageInstallIDRaw.result
     }
-    Else {
-        Write-Host "Package create failed. Terminating script, something went wrong."
-        break
+
+    # Check that something was pulled. Otherwise notify and exit
+    If ($packageInstallIDRaw.result.Count -lt 1) {
+        Write-Host "No data pulled for install links. Exiting."
+        exit
     }
-}
-## End process Package ##
-## Start get package ID ##
 
-Write-Host "Getting site code for installation"
+    # Because we only want the SiteCode we need to grab the data between "[" and "]" excluding the brackets from the returned string
+    $packageInstallIDString = [regex]::match($packageInstallIDRaw.result."installLinkWindows", '\[(.*?)\]').groups[1].value
 
-# update data being passed to API endpoint for getting the package install SiteCode
-$data = @{
-"id" = $bitdefenderCompanyID
-"method" = "getInstallationLinks"
-"jsonrpc" = "2.0"
-"params" = @{
-    "packageName" = $custPackageName} # End Params
-} # End Data
+    # [Info] Notify SiteCode
+    write-host "Site code is" $packageInstallIDString
 
-$body = $data | ConvertTo-Json
-
-$packageInstallIDRaw = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
-If ($testmodeVerbose -ne "false") {
-    Write-Host "Data returned for package ID: "$packageInstallIDRaw.result
-}
-
-# Check that something was pulled. Otherwise notify and exit
-If ($packageInstallIDRaw.result.Count -lt 1) {
-    Write-Host "No data pulled for install links. Exiting."
-    exit
-}
-
-# Because we only want the SiteCode we need to grab the data between "[" and "]" excluding the brackets from the returned string
-$packageInstallIDString = [regex]::match($packageInstallIDRaw.result."installLinkWindows", '\[(.*?)\]').groups[1].value
-
-# [Info] Notify SiteCode
-write-host "Site code is" $packageInstallIDString
-
-## End get package ID ##
+    ## End get package ID ##
+}# End if for skipToInstaller
 ## Start install on endpoint ##
 
 If ($testmode -eq "false") {
