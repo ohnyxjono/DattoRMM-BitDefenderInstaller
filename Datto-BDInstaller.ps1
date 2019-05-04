@@ -83,6 +83,16 @@ Else {
 #    No more variables   #
 ##########################
 
+# Check if Bitdefender Endpoint Security is already installed
+$installed = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where { $_.DisplayName -like "Bitdefender Endpoint Security*" }) -ne $null
+If (-Not $installed) {
+    Write-Host "Bitdefender is not installed already."
+}
+Else {
+    Write-Host "Bitdefender is already installed."
+    exit
+}
+
 # Display environment variables for verbose output
 If ($testmodeVerbose -ne "false") {
     Write-Host "Environment variables set:" 
