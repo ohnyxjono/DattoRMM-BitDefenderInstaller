@@ -40,7 +40,7 @@ $bitdefenderCompanyID = $env:rmmvBitDefenderCompanyID
 
 $testmode = $env:TestMode
 
-$testmodeVerbose = $env:VerboseOutput
+$testmodeVerbose = $testmode
 
 # Company name: If no customer name override is set at component or site level then use the Site name of the endpoint in Datto RMM using the CS_PROFILE_NAME variable
 If ($env:rmmvCustNameOverride -eq "false") {
