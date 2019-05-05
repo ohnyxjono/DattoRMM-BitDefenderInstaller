@@ -13,6 +13,7 @@
 # 27 Apr 2019 - Removed datto api dependency, added contributions and cleaned up some documentation
 # 30 Apr 2019 - Re-worked logic to account for packages already existing. Removed dependancy on specific package name. Added additional error checking. Added overrides for company name and package ID 
 # 3 May 2019 - Added tiered overrides, skips, made install sequence more efficient, better error checking and feedback 
+# 5 May 2019 - Combined testmode and verbose logging. Added check if BD is already installed. Reordered some variables in the component. Added exit code 1 for fails. Updated some descriptions. Made some output more readable.
 #
 # Full BitDefender API documentation at https://download.bitdefender.com/business/API/Bitdefender_GravityZone_Cloud_APIGuide_forPartners_enUS.pdf
 #
