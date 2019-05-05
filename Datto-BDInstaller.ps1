@@ -48,13 +48,13 @@ If ($testmodeVerbose -ne "false") {
 }
 
 # Company name: If no customer name override is set at component or site level then use the Site name of the endpoint in Datto RMM using the CS_PROFILE_NAME variable
-If ($env:rmmvCustNameOverride -eq "false") {
+If ($env:rmmvCustNameOverride.Length -lt 1) {
     
     If ($testmodeVerbose -ne "false") {
         Write-Host "Component level customer name override not set"
     }
     #If no override is set, check if Site level name override is set and use it, if not then use the Site name.
-    If ($env:SiteNameOverride) {
+    If ($env:SiteNameOverride.Length -gt 0) {
         $custName = $env:SiteNameOverride
         Write-Host "Site level SiteName override is set. Using $custName as customer name"
     }
