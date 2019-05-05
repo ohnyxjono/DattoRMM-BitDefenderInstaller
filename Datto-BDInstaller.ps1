@@ -42,9 +42,16 @@ $testmode = $env:TestMode
 
 $testmodeVerbose = $testmode
 
+If ($testmodeVerbose -ne "false") {
+    Write-Host "Verbose logging on"
+}
+
 # Company name: If no customer name override is set at component or site level then use the Site name of the endpoint in Datto RMM using the CS_PROFILE_NAME variable
 If ($env:rmmvCustNameOverride -eq "false") {
-    Write-Host "Component level customer name override not set"
+    
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "Component level customer name override not set"
+    }
     #If no override is set, check if Site level name override is set and use it, if not then use the Site name.
     If ($env:SiteNameOverride) {
         $custName = $env:SiteNameOverride
@@ -52,7 +59,10 @@ If ($env:rmmvCustNameOverride -eq "false") {
     }
     Else {
         $custName = $env:CS_PROFILE_NAME
-        Write-Host "Site level customer name override not set`nUsing Datto RMM Site name as BitDefender Company name: $custName"
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "Site level customer name override not set"
+        }
+        Write-Host "Using Datto RMM Site name as BitDefender Company name: $custName"
     }
 }
 Else {
@@ -68,14 +78,19 @@ If ($env:rmmvPackageOverride -like "*=") {
 }
 Else {
     # If the override isn't set, then check the PackageIDOverride field. If thats set then use it. If not then 
-    Write-Host "`nComponent level package override not set."
+    
+    If ($testmodeVerbose -ne "false") {
+        Write-Host "`nComponent level package override not set."
+    }
     If ($env:PackageIDOverride -like "*=") {
         $packageInstallIDString = $env:PackageIDOverride
         Write-Host "Site level Package ID Override set and passed initial validation. `nSkipping to install. `nPackage ID set to: "$packageInstallIDString 
         $skipToInstall = 'true'
     }
     Else {
-        Write-Host "No package overrides set"
+        If ($testmodeVerbose -ne "false") {
+            Write-Host "No package overrides set"
+        }
     }
 }
 
@@ -86,16 +101,16 @@ Else {
 # Check if Bitdefender Endpoint Security is already installed
 $installed = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where { $_.DisplayName -like "Bitdefender Endpoint Security*" }) -ne $null
 If (-Not $installed) {
-    Write-Host "Bitdefender is not installed already."
+    Write-Host "Bitdefender is not already installed."
 }
 Else {
     Write-Host "Bitdefender is already installed."
-    exit
+    exit 1
 }
 
 # Display environment variables for verbose output
 If ($testmodeVerbose -ne "false") {
-    Write-Host "Environment variables set:" 
+    Write-Host "`nEnvironment variables set:" 
     get-childitem env:\
 }
 
@@ -105,11 +120,11 @@ If ($skipToInstall -ne 'true') {
 	# Run some initial environment checks
 	If ($bitDefenderAPIKey -eq 'xxxxxxxxxx') {
 		Write-Host "You have not updated the BitDefender API Key. It will not work without this. Existing script."
-		exit
+		exit 1
 	}
 	Elseif ($bitdefenderCompanyID -eq 'xxxxxxxxxx') {
 		Write-Host "You have not updated the BitDefender Company ID. It will not work without this. Existing script."
-		exit
+		exit 1
 	}
 	Else {
 		Write-Host "`nChecking variables have been changed from the defaults complete."
@@ -118,7 +133,7 @@ If ($skipToInstall -ne 'true') {
 	# Check Powershell Version is at least version 3.0
 	if ($PSVersionTable.PSVersion.Major -le 3) {
 		Write-Host "This script uses Invoke-RestMethod which was introduced in Powershell 3.0.`nPowershell needs to be at least version 3 to run this script. Update powershell before running this."
-		exit
+		exit 1
 	}
 
 	# Append ":" to the end of the BitDefender API key
@@ -224,7 +239,7 @@ If ($skipToInstall -ne 'true') {
         If ($env:rmmvAllowBDChange -eq 'false') {
             Write-Host "Script was about to create a company in BitDefender GravityZone because an existing company for this endpoint does not exist already and a package override was not set. 
             `nOption has been set to not make any changes. Script will now exit as it will fail with no company name set."		
-            exit
+            exit 1
         }
 
 		$custID = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
@@ -233,7 +248,7 @@ If ($skipToInstall -ne 'true') {
 		}
 		Else {
 			Write-Host "Create company failed. Exiting script"
-			exit
+			exit 1
 		}
 
 		If ($testmodeVerbose -ne "false") {
@@ -358,7 +373,7 @@ If ($skipToInstall -ne 'true') {
             # If no changes to BD are to be made, exit
             If ($env:rmmvAllowBDChange -eq 'false') {
                 Write-Host "Script was about to create a package for $custName as an existing one was not found. `nOption set to not make changes. Exiting script."
-                exit
+                exit 1
             }
 			
 			$custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
@@ -422,7 +437,7 @@ If ($skipToInstall -ne 'true') {
         # If no changes to BD are to be made, exit
         If ($env:rmmvAllowBDChange -eq 'false') {
             Write-Host "Script was about to create a package for $custName as an existing one was not found. `nOption set to not make changes. Exiting script."
-            exit
+            exit 1
         }
 
 		$custPackage = Invoke-RestMethod -uri $endpoint -Headers $headers -Body $body -Method POST -ContentType 'application/json'
@@ -463,7 +478,7 @@ If ($skipToInstall -ne 'true') {
 	# Check that something was pulled. Otherwise notify and exit
 	If ($packageInstallIDRaw.result.Count -lt 1) {
 		Write-Host "No data pulled for install links. Likely the package was not created successfully. Terminating script."
-		exit
+		exit 1
 	}
 
 	# Because we only want the SiteCode we need to grab the data between "[" and "]" excluding the brackets from the returned string
@@ -485,7 +500,7 @@ If (Test-Path ".\eps_installer_signed.msi" -PathType Leaf){
 }
 Else {
     Write-Host "MSI Installer doesn't exist. Can't install, exiting"
-    exit
+    exit 1
 }
 
 # Make log file to inspect if something goes wrong
@@ -493,10 +508,10 @@ $DateStamp = get-date -Format ddMMyyyyTHHmmss
 $logFile = "$env:temp\BDInstallLog$DateStamp.log"
 
 # [Info] Notify logfile location
-Write-Host "Log file for install location: $env:temp\BDInstallLog$DateStamp.log"
+Write-Host "`nLog file for install location: $env:temp\BDInstallLog$DateStamp.log"
 
 # [Info] Notify package ID being used
-Write-Host "Package ID is: " $packageInstallIDString
+Write-Host "`nPackage ID is: " $packageInstallIDString
 
 If ($testmode -eq "false") {
     & ./eps_installer_signed.msi /qn /L*v $logFile GZ_PACKAGE_ID=$packageInstallIDString REBOOT_IF_NEEDED=1
