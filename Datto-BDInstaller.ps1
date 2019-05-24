@@ -14,6 +14,7 @@
 # 30 Apr 2019 - Re-worked logic to account for packages already existing. Removed dependancy on specific package name. Added additional error checking. Added overrides for company name and package ID 
 # 3 May 2019 - Added tiered overrides, skips, made install sequence more efficient, better error checking and feedback 
 # 5 May 2019 - Combined testmode and verbose logging. Added check if BD is already installed. Reordered some variables in the component. Added exit code 1 for fails. Updated some descriptions. Made some output more readable. Changed customer name override logic to not need the initial value to be false.
+# 25 May 2019 - Removed duplicate PS version check (IF check) - superceeded by #requires on line 1. Reworded some of the script completion messages. Made it clear that the API key display is test mode data. Added TODO's in notes.
 #
 # Full BitDefender API documentation at https://download.bitdefender.com/business/API/Bitdefender_GravityZone_Cloud_APIGuide_forPartners_enUS.pdf
 #
@@ -27,6 +28,13 @@
 # For site level: Site, Settings, Variables.
 # To change the default company name, make a variable called "SiteNameOverride" and give it the name of the BitDefender company to use.
 # To change the default package thats used, make a variable called "PackageIDOverride" and give it the ID of the BitDefender package installer
+#
+# TODO
+# clean up testmode & testmodeverbose variables
+# convert all "true"/"false" checks to booleans and then use $true & $false instead
+# a number of parts would probably be more efficient as functions
+# array declarations repeat a lot. I'm pretty sure the way they are declared could be made more efficient
+
 
 
 ##########################
@@ -131,12 +139,6 @@ If ($skipToInstall -ne 'true') {
 		Write-Host "`nChecking variables have been changed from the defaults complete."
 	}
 
-	# Check Powershell Version is at least version 3.0
-	if ($PSVersionTable.PSVersion.Major -le 3) {
-		Write-Host "This script uses Invoke-RestMethod which was introduced in Powershell 3.0.`nPowershell needs to be at least version 3 to run this script. Update powershell before running this."
-		exit 1
-	}
-
 	# Append ":" to the end of the BitDefender API key
 	$bitDefenderAPIKeyFormatted = $bitDefenderAPIKey + ':'
 
@@ -145,7 +147,7 @@ If ($skipToInstall -ne 'true') {
 	# Set the API key for BitDefender GravityZone.
 	$apikey = $bitDefenderAPIKeyFormatted
 	If ($testmodeVerbose -ne "false") {
-		Write-Host "BitDefender API Key variable set to: $apikey"
+		Write-Host "[TEST MODE DATA] BitDefender API Key variable set to: $apikey"
 	}
 
 	# Set API endpoint base URI
@@ -517,7 +519,7 @@ Write-Host "`nPackage ID is: " $packageInstallIDString
 If ($testmode -eq "false") {
     & ./eps_installer_signed.msi /qn /L*v $logFile GZ_PACKAGE_ID=$packageInstallIDString REBOOT_IF_NEEDED=1
 
-    Write-Host "The installation will proceed in the background to download the files and then install."
+    Write-Host "Installation started. 'setupdownloader.exe' should be running on the endpoint which indicates it is running the install successfully.`nThe full download size is arounf 700mb, internet speed will impact how long the installation will take"
 }
 Else {
     Write-Host "Script in test mode. Skipping client install."
@@ -525,4 +527,4 @@ Else {
 }
 
 ## End install on endpoint ##
-Write-Host "Script finished. setupdownloader.exe should start running on device shortly. Full download size is around 700mb, time to deploy on device will vary on internet speed."
+Write-Host "Script finished."
